@@ -1,6 +1,6 @@
 {
 	"name": "@lofcz/typesafe-i18n",
-	"version": "5.27.3",
+	"version": "5.27.4",
 	"description": "A fully type-safe and lightweight internationalization library for all your TypeScript and JavaScript projects.",
 	"author": "ivanhofer",
 	"homepage": "https://github.com/lofcz/typesafe-i18n",
