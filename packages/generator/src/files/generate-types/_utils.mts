@@ -35,17 +35,23 @@ const createUnionType = (entries: string[]) =>
 // --------------------------------------------------------------------------------------------------------------------
 
 // Iterative depth-first flattening to avoid stack overflow on large/deep trees.
+// Push children in reverse so pop() yields left-to-right order (same as the
+// previous recursive flatMap), which keeps formatter union member order stable.
 export const flattenToParsedResultEntry = (parsedResults: ParsedResult[]): ParsedResultEntry[] => {
 	const result: ParsedResultEntry[] = []
-	const stack: ParsedResult[] = [...parsedResults]
+	const stack: ParsedResult[] = [...parsedResults].reverse()
 
 	while (stack.length) {
 		const parsedResult = stack.pop() as ParsedResult
 		if (isParsedResultEntry(parsedResult)) {
 			result.push(parsedResult)
 		} else {
+			const nestedItems: ParsedResult[] = []
 			for (const nested of Object.values(parsedResult as Exclude<ParsedResult, ParsedResultEntry>)) {
-				for (const item of nested) stack.push(item)
+				for (const item of nested) nestedItems.push(item)
+			}
+			for (let i = nestedItems.length - 1; i >= 0; i--) {
+				stack.push(nestedItems[i] as ParsedResult)
 			}
 		}
 	}
