@@ -168,8 +168,14 @@ const transpileTypescriptFiles = async (
 ): Promise<string> => {
 	const bun = getBunRuntime()
 	if (bun) {
-		// Bun bundles the file and its imports natively; no 'typescript' installation needed
-		return transpileWithBun(bun, languageFilePath, tempPath)
+		// Bun.build flattens every entrypoint to '<outdir>/index.js'. Reusing the same
+		// outdir for each locale/namespace makes dynamic import() hit a cached ESM URL
+		// after the previous file was deleted — which hangs Bun's module loader.
+		// Emit into a unique subdirectory per language file instead (tsc already gets
+		// uniqueness for free via its mirrored source-tree emit).
+		const bunOutDir = resolve(tempPath, locale.replace(/[\\/]/g, '__'))
+		await createPathIfNotExits(bunOutDir)
+		return transpileWithBun(bun, languageFilePath, bunOutDir)
 	}
 
 	const ts = await getTypescriptCompiler()

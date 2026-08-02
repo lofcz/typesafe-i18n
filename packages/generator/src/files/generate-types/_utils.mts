@@ -34,14 +34,24 @@ const createUnionType = (entries: string[]) =>
 
 // --------------------------------------------------------------------------------------------------------------------
 
-export const flattenToParsedResultEntry = (parsedResults: ParsedResult[]): ParsedResultEntry[] =>
-	parsedResults.flatMap((parsedResult) =>
-		isParsedResultEntry(parsedResult)
-			? parsedResult
-			: Object.entries(parsedResult).flatMap(([_, nestedParsedResults]) =>
-					flattenToParsedResultEntry(nestedParsedResults),
-			  ),
-	)
+// Iterative depth-first flattening to avoid stack overflow on large/deep trees.
+export const flattenToParsedResultEntry = (parsedResults: ParsedResult[]): ParsedResultEntry[] => {
+	const result: ParsedResultEntry[] = []
+	const stack: ParsedResult[] = [...parsedResults]
+
+	while (stack.length) {
+		const parsedResult = stack.pop() as ParsedResult
+		if (isParsedResultEntry(parsedResult)) {
+			result.push(parsedResult)
+		} else {
+			for (const nested of Object.values(parsedResult as Exclude<ParsedResult, ParsedResultEntry>)) {
+				for (const item of nested) stack.push(item)
+			}
+		}
+	}
+
+	return result
+}
 
 // --------------------------------------------------------------------------------------------------------------------
 

@@ -13,19 +13,42 @@ import type { BaseTranslation } from '../../../../runtime/src/index.mjs'
 import type { Arg, ParsedResult, ParsedResultEntry, Types } from '../../types.mjs'
 import type { Logger } from '../../utils/logger.mjs'
 
+// Iterative breadth-first walk to avoid stack overflow on large/deep dictionaries.
+// Preserves the original return shape: ParsedResult[] where nested objects are
+// `{ [key]: ParsedResult[] }` — required by flattenToParsedResultEntry.
 export const parseDictionary = (
 	translations: BaseTranslation | BaseTranslation[] | Readonly<BaseTranslation> | Readonly<BaseTranslation[]>,
 	logger: Logger,
 	parentKeys = [] as string[],
-): ParsedResult[] =>
-	isObject(translations)
-		? Object.entries(translations).map(([key, text]) => {
-				if (isString(text)) {
-					return parseTranslationEntry([key, text], logger, parentKeys) as ParsedResultEntry
-				}
-				return { [key]: parseDictionary(text, logger, [...parentKeys, key]) } as ParsedResult
-		  })
-		: []
+): ParsedResult[] => {
+	if (!isObject(translations)) return []
+
+	type QueueNode = {
+		source: BaseTranslation | Readonly<BaseTranslation>
+		keys: string[]
+		results: ParsedResult[]
+	}
+
+	const rootResults: ParsedResult[] = []
+	const queue: QueueNode[] = [{ source: translations as BaseTranslation, keys: parentKeys, results: rootResults }]
+
+	while (queue.length) {
+		const { source, keys, results } = queue.shift() as QueueNode
+
+		for (const [key, text] of Object.entries(source)) {
+			if (isString(text)) {
+				const entry = parseTranslationEntry([key, text], logger, keys) as ParsedResultEntry | null
+				if (entry) results.push(entry)
+			} else if (isObject(text)) {
+				const childResults: ParsedResult[] = []
+				results.push({ [key]: childResults } as ParsedResult)
+				queue.push({ source: text as BaseTranslation, keys: [...keys, key], results: childResults })
+			}
+		}
+	}
+
+	return rootResults
+}
 
 const parseTranslationEntry = (
 	[key, text]: [string, string],
